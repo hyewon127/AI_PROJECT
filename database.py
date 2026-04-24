@@ -44,6 +44,22 @@ class DatabaseManager:
         except Exception as e:
             return {"success": False, "message": str(e)}
 
+    def createTable(self):
+        """ 이미지 분석 결과를 저장할 테이블 생성 """
+        try:
+            query = """
+            CREATE TABLE IF NOT EXISTS image_analysis (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                fileName VARCHAR(255),
+                question TEXT,
+                answer TEXT,
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+            return self.executeQuery(query)
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
     def fetchAll(self, query, params=None):
         """ 데이터 조회 함수 (SELECT) """
         try:
