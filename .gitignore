@@ -13,3 +13,5 @@ dataset/
 .venv/
 venv/ 
 
+#웹 모듈
+package.json
