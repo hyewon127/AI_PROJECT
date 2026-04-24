@@ -13,26 +13,33 @@ import uvicorn
 
 app = FastAPI()
 
-try:
-    # 모든 Origin, Method, Header 허용 (가이드 준수)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# 모든 Origin, Method, Header 허용 (가이드 준수)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    dbManager = DatabaseManager()
-    # 서버 시작 전 테이블 생성 확인 (가이드 준수)
-    dbManager.createTable()
-except Exception as e:
-    print(f"Initialization Error: {str(e)}")
+dbManager = DatabaseManager()
+
+# 서버 시작 시 실행되는 이벤트
+@app.on_event("startup")
+async def startupEvent():
+    """ 서버 시작 시 DB와 테이블을 자동으로 생성 및 초기화합니다. """
+    print("------------------------------------------")
+    print("시스템 초기화를 시작합니다...")
+    initResult = dbManager.initializeDb()
+    if initResult["success"]:
+        print("모든 DB 환경이 정상적으로 준비되었습니다.")
+    else:
+        print(f"시스템 초기화 실패: {initResult['message']}")
+    print("------------------------------------------")
 
 def analyzeWithGemma(imageBytes, userQuestion):
     """ Ollama gemma4:e2b 모델을 사용한 이미지 분석 """
     try:
-        # config 객체에서 모델 이름 참조 (기본값 gemma4:e2b)
         modelName = config.ollamaModel
         response = ollama.generate(
             model=modelName,
@@ -47,10 +54,9 @@ def analyzeWithGpt(imageBytes, userQuestion):
     """ OpenAI GPT-4o 모델을 사용한 이미지 분석 """
     try:
         client = openai.OpenAI(api_key=config.openaiApiKey)
-        # 이미지를 base64로 인코딩
         base64Image = base64.b64encode(imageBytes).decode('utf-8')
         
-        response = client.chat.complet_with_gpt = client.chat.completions.create(
+        response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {
@@ -70,23 +76,18 @@ def analyzeWithGpt(imageBytes, userQuestion):
 async def analyzeImage(uploadFile: UploadFile = File(...), userQuestion: str = Form(...)):
     """ 이미지 업로드 및 모델 기반 질문 답변 API """
     try:
-        # 0. 이미지 데이터 비동기 읽기
         imageData = await uploadFile.read()
         
-        # 1. 파일 시스템에 이미지 저장 (os.listdir 활용 경로 관리)
+        # 데이터셋 저장 폴더 체크
         targetDir = "dataset"
-        isDirExist = False
         rootFiles = os.listdir(".")
-        
-        # 가이드 준수: 반드시 for i in range(0, len(obj)) 형식을 취할 것
+        isDirExist = False
         for i in range(0, len(rootFiles)):
             if rootFiles[i] == targetDir:
                 isDirExist = True
                 break
         
-        if isDirExist == True:
-            pass
-        else:
+        if isDirExist == False:
             os.makedirs(targetDir)
             
         fileName = uploadFile.filename
@@ -95,7 +96,7 @@ async def analyzeImage(uploadFile: UploadFile = File(...), userQuestion: str = F
         with open(savePath, "wb") as f:
             f.write(imageData)
             
-        # 2. config 객체를 통한 모델 선택 및 분석 (if-elif-else 명확히 구분)
+        # 모델 분석 로직
         activeModel = config.useModel
         resultText = ""
         
@@ -106,16 +107,17 @@ async def analyzeImage(uploadFile: UploadFile = File(...), userQuestion: str = F
         else:
             return {"success": False, "message": "잘못된 모델 설정입니다."}
             
-        # 3. 분석 결과 DB 저장 (명명 규칙 준수)
+        # 결과 DB 저장
         insertQuery = "INSERT INTO image_analysis (fileName, question, answer) VALUES (%s, %s, %s)"
-        dbManager.executeQuery(insertQuery, (fileName, userQuestion, resultText))
+        dbResult = dbManager.executeQuery(insertQuery, (fileName, userQuestion, resultText))
         
-        return {"success": True, "result": resultText}
+        if dbResult["success"]:
+            return {"success": True, "result": resultText}
+        else:
+            return {"success": False, "message": f"DB 저장 실패: {dbResult['message']}"}
         
     except Exception as e:
-        # 에러 발생 시 지정된 JSON 반환 (가이드 준수)
         return {"success": False, "message": str(e)}
 
 if __name__ == "__main__":
-    # CMD 환경에서는 표준 uvicorn.run 방식을 사용합니다.
     uvicorn.run(app, host="0.0.0.0", port=8000)
