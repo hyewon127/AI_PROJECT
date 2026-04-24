@@ -33,13 +33,13 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
             return res.status(400).json({ success: false, message: '이미지 파일이 없습니다.' });
         }
 
-        // FastAPI 서버로 전달할 FormData 생성
+        // FastAPI 서버로 전달할 FormData 생성 (필드명을 FastAPI 매개변수와 일치시킴)
         const form = new FormData();
-        form.append('image', file.buffer, {
+        form.append('uploadFile', file.buffer, {
             filename: file.originalname,
             contentType: file.mimetype,
         });
-        form.append('question', question);
+        form.append('userQuestion', question);
 
         // FastAPI 서버(http://localhost:8000/analyze)로 요청 전달
         const response = await axios.post('http://localhost:8000/analyze', form, {
