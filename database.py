@@ -1,20 +1,17 @@
 # pip install pymysql python-dotenv
 import pymysql
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
+from config import config
 
 class DatabaseManager:
     """ MySQL 데이터베이스 연동 및 쿼리 관리 클래스 """
     
     def __init__(self):
-        """ DB 연결 설정 초기화 """
+        """ DB 연결 설정 초기화 (config 객체 사용) """
         try:
-            self.host = os.getenv("DB_HOST")
-            self.user = os.getenv("DB_USER")
-            self.password = os.getenv("DB_PASSWORD")
-            self.database = os.getenv("DB_NAME")
+            self.host = config.dbHost
+            self.user = config.dbUser
+            self.password = config.dbPassword
+            self.database = config.dbName
             self.connection = None
         except Exception as e:
             print(f"Init Error: {str(e)}")
